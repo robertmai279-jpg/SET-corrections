@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SET Bias Correction Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --ink: #1a1a2e;
+      --paper: #f5f0e8;
+      --cream: #ede8dd;
+      --accent: #c0392b;
+      --accent-light: #f5e8e7;
+      --gold: #b8860b;
+      --muted: #7a7060;
+      --border: #ccc4b4;
+      --green: #2d6a4f;
+      --green-light: #d8ead3;
+      --blue: #1a3a5c;
+      --blue-light: #d2e0ed;
+      --white: #ffffff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 14px 24px 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      flex-wrap: wrap;
+      position: relative;
+      flex-shrink: 0;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--gold);
+    }
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.2rem;
+      color: var(--paper);
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .header-title em { font-style: italic; color: #e8c98a; }
+    .header-meta {
+      font-size: 0.68rem;
+      color: rgba(245,240,232,0.5);
+      flex: 1;
+    }
+    .header-meta a { color: rgba(232,201,138,0.75); text-decoration: none; border-bottom: 1px dotted currentColor; }
+    .header-meta a:hover { color: #e8c98a; }
+
+    /* ── APP SHELL ── */
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+    @media (max-width: 700px) {
+      .app { grid-template-columns: 1fr; overflow: visible; }
+    }
+
+    /* ── LEFT PANEL ── */
+    .panel-inputs {
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      padding: 16px 18px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 0; }
+
+    .input-group-label {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--muted);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--cream);
+      margin-bottom: 10px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .field .hint {
+      font-size: 0.64rem;
+      color: var(--muted);
+      margin-top: -1px;
+    }
+    .field input,
+    .field select {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 6px 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: var(--ink);
+      background: var(--paper);
+      outline: none;
+      transition: border-color 0.12s, box-shadow 0.12s;
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a7060' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      padding-right: 26px;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 2px rgba(26,26,46,0.08);
+    }
+
+    /* gender toggle */
+    .gender-toggle {
+      display: grid;
+      grid-template-columns: 1fr;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .gender-toggle .g-opt { display: contents; }
+    .gender-toggle input[type=radio] { display: none; }
+    .gender-toggle label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+      font-weight: 400;
+      cursor: pointer;
+      background: var(--paper);
+      color: var(--muted);
+      transition: background 0.12s, color 0.12s;
+      user-select: none;
+    }
+    .gender-toggle .g-opt:first-child label { border-right: 1px solid var(--border); }
+    .gender-toggle input[type=radio]:checked + label {
+      background: var(--ink);
+      color: var(--paper);
+      font-weight: 500;
+    }
+
+    /* SET score highlight */
+    .field-set {
+      background: var(--accent-light);
+      border: 1.5px solid #d9a09a;
+      border-radius: 4px;
+      padding: 11px 12px;
+    }
+    .field-set label { color: var(--accent); font-weight: 600; font-size: 0.74rem; }
+    .field-set .hint { color: #b07070; }
+    .field-set input {
+      background: white;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-color: #d9a09a;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .panel-results {
+      padding: 16px 20px 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* score strip */
+    .score-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .score-box {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 14px;
+      background: white;
+      text-align: center;
+    }
+    .score-box.dark { background: var(--ink); border-color: var(--ink); }
+    .score-box .lbl {
+      font-size: 0.62rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .score-box.dark .lbl { color: rgba(245,240,232,0.42); }
+    .score-box .num {
+      font-family: 'DM Serif Display', serif;
+      font-size: 2rem;
+      line-height: 1;
+      color: var(--ink);
+      transition: color 0.2s;
+    }
+    .score-box.dark .num { color: #e8c98a; }
+
+    /* result section title */
+    .rst {
+      font-size: 0.64rem;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--muted);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--cream);
+    }
+
+    /* compact table */
+    .cf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+    }
+    .cf-table th {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 5px 9px;
+      text-align: left;
+      font-weight: 500;
+      font-size: 0.67rem;
+      letter-spacing: 0.02em;
+    }
+    .cf-table td {
+      padding: 6px 9px;
+      border-bottom: 1px solid var(--cream);
+      vertical-align: middle;
+    }
+    .cf-table tr:last-child td { border-bottom: none; }
+    .cf-table tr:nth-child(even) td { background: #faf8f4; }
+    .cf-table td:first-child { color: var(--muted); }
+
+    .pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+    .pill.pos  { background: var(--green-light); color: var(--green); }
+    .pill.neg  { background: var(--accent-light); color: var(--accent); }
+    .pill.zero { background: var(--cream); color: var(--muted); }
+
+    /* 2-col tables grid */
+    .tables-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 960px) { .tables-grid { grid-template-columns: 1fr; } }
+
+    .tblock { display: flex; flex-direction: column; gap: 5px; }
+    .tblock.full { grid-column: 1 / -1; }
+
+    /* disclaimer */
+    .disclaimer {
+      background: var(--blue-light);
+      border-left: 3px solid var(--blue);
+      padding: 8px 12px;
+      font-size: 0.67rem;
+      color: var(--blue);
+      border-radius: 0 3px 3px 0;
+      line-height: 1.5;
+    }
+
+    /* cert button */
+    .cert-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--gold);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      padding: 9px 18px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+      align-self: flex-start;
+    }
+    .cert-btn:hover {
+      background: #9a7009;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(184,134,11,0.25);
+    }
+
+    /* footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 24px;
+      font-size: 0.62rem;
+      color: var(--muted);
+      background: var(--white);
+      flex-shrink: 0;
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">SET Bias Correction &mdash; <em>Live corrections</em></div>
+  <div class="header-meta">
+    Based on
+    <a href="https://doi.org/10.5465/amle.2023.0541" target="_blank">Bashirzadeh, Meunier &amp; Mai (2025)</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://scholar.google.de/citations?user=TUQxeH0AAAAJ" target="_blank">Bashirzadeh</a>,
+    <a href="https://scholar.google.de/citations?user=z5kg56MAAAAJ" target="_blank">Meunier</a>,
+    <a href="https://scholar.google.de/citations?user=HJcUHgkAAAAJ" target="_blank">Mai</a>
+    &nbsp;&middot;&nbsp; Acad. of Mgmt. Learning &amp; Education, 25(1), 10–32
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ══ LEFT: INPUTS ══ -->
+  <div class="panel-inputs">
+
+    <div class="input-group">
+      <div class="input-group-label">Professor</div>
+
+      <div class="field">
+        <label>Gender</label>
+        <div class="gender-toggle">
+          <div class="g-opt">
+            <input type="radio" name="prof-gender" id="pg-female" value="0">
+            <label for="pg-female">Female</label>
+          </div>
+          <div class="g-opt">
+            <input type="radio" name="prof-gender" id="pg-male" value="1" checked>
+            <label for="pg-male">Male</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Age (years)</label>
+        <input type="number" id="prof-age" value="44" min="20" max="90" step="1"/>
+      </div>
+
+      <div class="field">
+        <label>Position</label>
+        <select id="full-time">
+          <option value="1" selected>Full-time / Permanent</option>
+          <option value="0">Adjunct / Part-time</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Native speaker</label>
+        <select id="native">
+          <option value="1">Yes</option>
+          <option value="0" selected>No</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="input-group-label">Students &amp; Class</div>
+
+      <div class="field">
+        <label>Avg. student gender (male proportion)</label>
+        <span class="hint">0 = all female &nbsp;&middot;&nbsp; 0.5 = equal &nbsp;&middot;&nbsp; 1 = all male</span>
+        <input type="number" id="stud-gender" value="0.5" min="0" max="1" step="0.01"/>
+      </div>
+
+      <div class="field">
+        <label>Avg. student age (years)</label>
+        <input type="number" id="stud-age" value="22" min="17" max="60" step="1"/>
+      </div>
+
+      <div class="field">
+        <label>Avg. student grade (0–20)</label>
+        <input type="number" id="stud-grade" value="14" min="0" max="20" step="0.1"/>
+      </div>
+
+      <div class="field">
+        <label>Cultural distance (%)</label>
+        <span class="hint">0 = no distance &nbsp;&middot;&nbsp; 100 = extreme</span>
+        <input type="number" id="cult-dist" value="0" min="0" max="100" step="1"/>
+      </div>
+    </div>
+
+    <div class="field field-set">
+      <label>Your current SET score</label>
+      <span class="hint">Typically on a 1–5 or 1–7 scale</span>
+      <input type="number" id="set-score" value="4" min="0" max="10" step="0.01"/>
+    </div>
+
+  </div>
+
+  <!-- ══ RIGHT: LIVE RESULTS ══ -->
+  <div class="panel-results">
+
+    <div class="score-strip">
+      <div class="score-box">
+        <div class="lbl">Raw SET Score</div>
+        <div class="num" id="res-raw">4.00</div>
+      </div>
+
+    </div>
+
+    <div class="tables-grid">
+
+      <div class="tblock">
+        <div class="rst">Gender</div>
+        <table class="cf-table">
+          <thead><tr><th>If gender were…</th><th>% Change</th><th>Corrected SET</th></tr></thead>
+          <tbody id="cf-gender"></tbody>
+        </table>
+      </div>
+
+      <div class="tblock">
+        <div class="rst">Age</div>
+        <table class="cf-table">
+          <thead><tr><th>If age were…</th><th>% Change</th><th>Corrected SET</th></tr></thead>
+          <tbody id="cf-age"></tbody>
+        </table>
+      </div>
+
+      <div class="tblock">
+        <div class="rst">Grading</div>
+        <table class="cf-table">
+          <thead><tr><th>Grading scenario</th><th>% Change</th><th>Corrected SET</th></tr></thead>
+          <tbody id="cf-grade"></tbody>
+        </table>
+      </div>
+
+      <div class="tblock">
+        <div class="rst">Employment &amp; Language</div>
+        <table class="cf-table">
+          <thead><tr><th>Scenario</th><th>% Change</th><th>Corrected SET</th></tr></thead>
+          <tbody id="cf-status"></tbody>
+        </table>
+      </div>
+
+      <div class="tblock full">
+        <div class="rst">Cultural Distance</div>
+        <table class="cf-table">
+          <thead><tr><th>If cultural distance were…</th><th>% Change</th><th>Corrected SET</th></tr></thead>
+          <tbody id="cf-culture"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <div class="disclaimer">
+      <strong>Note.</strong> Adjustments are based on research data and somewhat limited to the Business School context. Gender corrections use male/female data only.
+    </div>
+
+    <button class="cert-btn" onclick="generateCertificate()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      Download PDF Certificate
+    </button>
+
+  </div>
+</div>
+
+<footer>
+  Bashirzadeh, Y., Meunier, L., &amp; Mai, R. (2025). Do Business School Students Value Faculty Diversity? Insights From a Dyadic Analysis of Students' Evaluations of Teaching.
+  <em>Academy of Management Learning &amp; Education, 25</em>(1), 10–32.
+  &nbsp;<a href="https://doi.org/10.5465/amle.2023.0541" target="_blank">https://doi.org/10.5465/amle.2023.0541</a>
+</footer>
+
+<script>
+// ── COEFFICIENTS ──
+const C = {
+  euclidDist:                -0.0027,
+  euclidDist2:                0.0002,
+  profGenderMale:             1.3161,
+  profAge:                    0.0544,
+  profGenderXAge:            -0.0442,
+  profAge2:                  -0.0005,
+  profGenderXAge2:            0.0003,
+  studGenderMale:             0.2266,
+  studGenderXProfGender:     -0.2061,
+  studGenderXProfAge:        -0.0117,
+  studGenderXProfGenderXAge:  0.013,
+  studGenderXProfAge2:        0.0001,
+  studGenderXProfGenderXAge2:-0.0001,
+  studAge:                    0.0131,
+  studGrade:                  0.0382,
+  fullTime:                   0.1006,
+  native:                     0.0918,
+  constant:                   1.7123
+};
+
+function predict(v) {
+  const hcd = v.cd / 2;
+  return (
+    C.constant
+    + C.euclidDist                * hcd
+    + C.euclidDist2               * hcd ** 2
+    + C.profGenderMale            * v.pg
+    + C.profAge                   * v.pa
+    + C.profGenderXAge            * v.pg * v.pa
+    + C.profAge2                  * v.pa ** 2
+    + C.profGenderXAge2           * v.pg * v.pa ** 2
+    + C.studGenderMale            * v.sg
+    + C.studGenderXProfGender     * v.sg * v.pg
+    + C.studGenderXProfAge        * v.sg * v.pa
+    + C.studGenderXProfGenderXAge * v.sg * v.pg * v.pa
+    + C.studGenderXProfAge2       * v.sg * v.pa ** 2
+    + C.studGenderXProfGenderXAge2* v.sg * v.pg * v.pa ** 2
+    + C.studAge                   * v.sa
+    + C.studGrade                 * v.grade
+    + C.fullTime                  * v.ft
+    + C.native                    * v.nat
+  );
+}
+
+function cf(base, overrides) {
+  return predict(Object.assign({}, base, overrides));
+}
+
+function getVars() {
+  const pgEl = document.querySelector('input[name="prof-gender"]:checked');
+  return {
+    cd:    parseFloat(document.getElementById('cult-dist').value)   || 0,
+    pg:    pgEl ? parseFloat(pgEl.value) : 1,
+    pa:    parseFloat(document.getElementById('prof-age').value)    || 44,
+    sg:    parseFloat(document.getElementById('stud-gender').value) ?? 0.5,
+    sa:    parseFloat(document.getElementById('stud-age').value)    || 22,
+    grade: parseFloat(document.getElementById('stud-grade').value)  || 14,
+    ft:    parseFloat(document.getElementById('full-time').value),
+    nat:   parseFloat(document.getElementById('native').value),
+    set:   parseFloat(document.getElementById('set-score').value)   || 4
+  };
+}
+
+function pill(pct) {
+  const cls = pct > 0.001 ? 'pos' : pct < -0.001 ? 'neg' : 'zero';
+  const s = pct >= 0 ? '+' : '';
+  return `<span class="pill ${cls}">${s}${(pct * 100).toFixed(1)}%</span>`;
+}
+
+function row(label, pct, corr) {
+  return `<tr><td>${label}</td><td>${pill(pct)}</td><td><strong>${corr.toFixed(2)}</strong></td></tr>`;
+}
+
+function update() {
+  const v = getVars();
+  const baseV = predict(v);
+  const raw = v.set;
+
+  document.getElementById('res-raw').textContent = raw.toFixed(2);
+  // model-predicted hidden
+
+  // Gender
+  const otherPG = v.pg === 1 ? 0 : 1;
+  const otherLabel = v.pg === 1 ? 'Female' : 'Male';
+  const cfG = cf(v, { pg: otherPG });
+  document.getElementById('cf-gender').innerHTML =
+    row(otherLabel, (cfG / baseV) - 1, raw * (cfG / baseV));
+
+  // Age
+  document.getElementById('cf-age').innerHTML = [25, 30, 40, 50, 60].map(pa => {
+    const r = cf(v, { pa });
+    return row(pa + ' years', (r / baseV) - 1, raw * (r / baseV));
+  }).join('');
+
+  // Grade
+  const grades = [
+    ['Tough (10th pct, ≈11.4)', 11.425],
+    ['Average (50th pct, ≈14.6)', 14.6],
+    ['Soft (75th pct, ≈16)', 16],
+    ['Very soft (95th pct, ≈17.9)', 17.9],
+  ];
+  document.getElementById('cf-grade').innerHTML = grades.map(([lbl, grade]) => {
+    const r = cf(v, { grade });
+    return row(lbl, (r / baseV) - 1, raw * (r / baseV));
+  }).join('');
+
+  // Status
+  const cfFT  = cf(v, { ft:  v.ft  === 1 ? 0 : 1 });
+  const cfNat = cf(v, { nat: v.nat === 1 ? 0 : 1 });
+  document.getElementById('cf-status').innerHTML =
+    row(v.ft  === 1 ? 'Adjunct / Part-time'  : 'Full-time / Permanent', (cfFT  / baseV) - 1, raw * (cfFT  / baseV)) +
+    row(v.nat === 1 ? 'Non-native speaker'    : 'Native speaker',        (cfNat / baseV) - 1, raw * (cfNat / baseV));
+
+  // Culture
+  document.getElementById('cf-culture').innerHTML = [0, 20, 40, 60, 80].map(cd => {
+    const r = cf(v, { cd });
+    return row(cd + '%', (r / baseV) - 1, raw * (r / baseV));
+  }).join('');
+
+  window._last = { v, baseV, raw };
+}
+
+// Attach live listeners to every input
+document.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('input', update);
+  el.addEventListener('change', update);
+});
+
+// Initial render on page load
+update();
+
+// ── PDF CERTIFICATE ──
+function generateCertificate() {
+  if (!window._last) return;
+  const { v, baseV, raw: rawSET } = window._last;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, H = 297;
+
+  doc.setFillColor(245, 240, 232); doc.rect(0, 0, W, H, 'F');
+  doc.setFillColor(26, 26, 46);    doc.rect(0, 0, W, 52, 'F');
+  doc.setFillColor(184, 134, 11);  doc.rect(0, 52, W, 2.5, 'F');
+  doc.setDrawColor(184, 134, 11);  doc.setLineWidth(0.8); doc.rect(10, 10, W - 20, H - 20, 'S');
+
+  doc.setTextColor(184, 134, 11); doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('BIAS CORRECTION CERTIFICATE', W / 2, 22, { align: 'center' });
+  doc.setTextColor(245, 240, 232); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+  doc.text('Student Evaluation of Teaching', W / 2, 36, { align: 'center' });
+  doc.setFontSize(11); doc.setFont('helvetica', 'italic');
+  doc.text('Corrected for Demographic & Structural Bias', W / 2, 46, { align: 'center' });
+
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  doc.setTextColor(120, 100, 80); doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
+  doc.text('Generated on ' + today, W / 2, 63, { align: 'center' });
+
+  // Score boxes
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(200, 192, 176); doc.setLineWidth(0.5);
+  doc.roundedRect(18, 72, 80, 36, 2, 2, 'FD');
+  doc.setTextColor(107, 107, 107); doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+  doc.text('RAW SET SCORE', 58, 82, { align: 'center' });
+  doc.setTextColor(26, 26, 46); doc.setFontSize(26); doc.setFont('helvetica', 'bold');
+  doc.text(rawSET.toFixed(2), 58, 98, { align: 'center' });
+
+  doc.setFillColor(26, 26, 46); doc.setDrawColor(26, 26, 46);
+  doc.roundedRect(112, 72, 80, 36, 2, 2, 'FD');
+  doc.setTextColor(150, 130, 80); doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+  doc.text('MODEL-PREDICTED SET', 152, 82, { align: 'center' });
+  doc.setTextColor(232, 201, 138); doc.setFontSize(26); doc.setFont('helvetica', 'bold');
+  doc.text(baseV.toFixed(3), 152, 98, { align: 'center' });
+
+  // Profile
+  let y = 120;
+  doc.setTextColor(26, 26, 46); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+  doc.text('Profile Summary', 18, y);
+  doc.setFillColor(26, 26, 46); doc.rect(18, y + 2, 174, 0.5, 'F'); y += 10;
+
+  const items = [
+    ['Professor gender', v.pg === 1 ? 'Male' : 'Female'],
+    ['Professor age', v.pa + ' years'],
+    ['Employment', v.ft === 1 ? 'Full-time' : 'Adjunct'],
+    ['Language', v.nat === 1 ? 'Native speaker' : 'Non-native speaker'],
+    ['Avg. student gender', v.sg + ' (male proportion)'],
+    ['Avg. student age', v.sa + ' years'],
+    ['Avg. student grade', v.grade + ' / 20'],
+    ['Cultural distance', v.cd + '%'],
+  ];
+  doc.setFontSize(9);
+  items.forEach(([k, val], i) => {
+    const col = i % 2 === 0 ? 18 : 110;
+    const rowY = y + Math.floor(i / 2) * 9;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 100, 80); doc.text(k + ':', col, rowY);
+    doc.setFont('helvetica', 'bold');   doc.setTextColor(26, 26, 46);  doc.text(val, col + 50, rowY);
+  });
+  y += Math.ceil(items.length / 2) * 9 + 8;
+
+  // CF table
+  doc.setTextColor(26, 26, 46); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+  doc.text('Key Counterfactual Corrections', 18, y);
+  doc.setFillColor(26, 26, 46); doc.rect(18, y + 2, 174, 0.5, 'F'); y += 12;
+
+  doc.setFillColor(26, 26, 46); doc.rect(18, y - 5, 174, 9, 'F');
+  doc.setTextColor(245, 240, 232); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+  doc.text('Scenario', 22, y + 0.5);
+  doc.text('% Change', 130, y + 0.5);
+  doc.text('Corrected SET', 162, y + 0.5);
+  y += 7;
+
+  const trows = [
+    [`Gender: ${v.pg === 1 ? 'Female' : 'Male'}`,    (cf(v,{pg:v.pg===1?0:1}) / baseV)-1, rawSET*(cf(v,{pg:v.pg===1?0:1})/baseV)],
+    [`Employment: ${v.ft===1?'Adjunct':'Full-time'}`, (cf(v,{ft:v.ft===1?0:1}) / baseV)-1, rawSET*(cf(v,{ft:v.ft===1?0:1})/baseV)],
+    [`Language: ${v.nat===1?'Non-native':'Native'}`,  (cf(v,{nat:v.nat===1?0:1})/baseV)-1, rawSET*(cf(v,{nat:v.nat===1?0:1})/baseV)],
+    ['Age: 40 years',         (cf(v,{pa:40})   / baseV)-1, rawSET*(cf(v,{pa:40})   /baseV)],
+    ['Grade: avg (14.6/20)',  (cf(v,{grade:14.6})/baseV)-1, rawSET*(cf(v,{grade:14.6})/baseV)],
+    ['Cultural distance: 0%', (cf(v,{cd:0})    / baseV)-1, rawSET*(cf(v,{cd:0})    /baseV)],
+  ];
+
+  doc.setFontSize(8.5);
+  trows.forEach(([lbl, pct, corr], i) => {
+    const ry = y + i * 9;
+    if (i % 2 === 0) { doc.setFillColor(237, 232, 221); doc.rect(18, ry - 5, 174, 9, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(lbl, 22, ry);
+    const sign = pct >= 0 ? '+' : '';
+    const ps = sign + (pct * 100).toFixed(1) + '%';
+    if (pct > 0.001) doc.setTextColor(45, 106, 79);
+    else if (pct < -0.001) doc.setTextColor(192, 57, 43);
+    else doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'bold'); doc.text(ps, 147, ry, { align: 'right' });
+    doc.setTextColor(26, 26, 46); doc.text(corr.toFixed(2), 184, ry, { align: 'right' });
+  });
+  y += trows.length * 9 + 10;
+
+  doc.setFillColor(210, 224, 237); doc.roundedRect(18, y, 174, 18, 2, 2, 'F');
+  doc.setDrawColor(26, 58, 92); doc.setLineWidth(0.6); doc.line(18, y, 18, y + 18);
+  doc.setTextColor(26, 58, 92); doc.setFontSize(7.5); doc.setFont('helvetica', 'italic');
+  doc.text(doc.splitTextToSize('Note: Adjustments are based on the research data and limited to the Business School context. Gender corrections use male/female data only.', 166), 24, y + 7);
+  y += 26;
+
+  doc.setTextColor(107, 107, 107); doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+  doc.text(doc.splitTextToSize("Bashirzadeh, Y., Meunier, L., & Mai, R. (2025). Do Business School Students Value Faculty Diversity? Insights From a Dyadic Analysis of Students' Evaluations of Teaching. Academy of Management Learning & Education, 25(1), 10–32. https://doi.org/10.5465/amle.2023.0541", 174), 18, y);
+
+  doc.setDrawColor(184, 134, 11); doc.setLineWidth(0.5); doc.line(18, H - 20, W - 18, H - 20);
+  doc.setTextColor(120, 100, 80); doc.setFontSize(7.5);
+  doc.text('SET Bias Correction Tool · Bashirzadeh, Meunier & Mai (2025)', W / 2, H - 13, { align: 'center' });
+
+  doc.save('SET_Bias_Correction_Certificate.pdf');
+}
+</script>
+</body>
+</html>
